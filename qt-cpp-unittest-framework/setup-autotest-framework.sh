@@ -133,31 +133,22 @@ detect_project_structure() {
     if grep -q "Qt[56]" "${PROJECT_ROOT}/CMakeLists.txt" 2>/dev/null || \
        grep -q "find_package(Qt" "${PROJECT_ROOT}/CMakeLists.txt" 2>/dev/null || \
        grep -q "Qt[56]" "$SOURCE_DIR"/* 2>/dev/null; then
-        USE_QT=true
-        print_success "检测到 Qt 支持"
-    fi
-
+         USE_QT=true
+         print_success "检测到 Qt 支持"
+     fi
+    
     # 检测插件目录
     PLUGIN_DIR=""
     if [ -d "${PROJECT_ROOT}/plugins" ]; then
         PLUGIN_DIR="${PROJECT_ROOT}/plugins"
         print_success "检测到插件目录: plugins/"
     fi
-
+    
     # 检测服务目录
     SERVICE_DIR=""
     if [ -d "${PROJECT_ROOT}/services" ]; then
         SERVICE_DIR="${PROJECT_ROOT}/services"
         print_success "检测到服务目录: services/"
-    fi
-
-    # 检测是否使用 Qt
-    USE_QT=false
-    if grep -q "Qt[56]" "${PROJECT_ROOT}/CMakeLists.txt" 2>/dev/null || \
-       grep -q "find_package(Qt" "${PROJECT_ROOT}/CMakeLists.txt" 2>/dev/null || \
-       grep -q "Qt[56]" "${SOURCE_DIR}"/* 2>/dev/null; then
-        USE_QT=true
-        print_success "检测到 Qt 支持"
     fi
 
     # 检测 C++ 标准
@@ -221,7 +212,7 @@ copy_stub_ext() {
     local SKILL_RESOURCE_DIR="${SCRIPT_DIR}/resources/testutils"
 
     # 检查是否已经存在且完整（至少 6 个文件）
-    if [ -d "$STUBUTILS_DIR" ] && [ $(find "$STUBUTILS_DIR" -name "*.h" -o -name "*.cpp" | wc -l) -ge 6 ]; then
+    if [ -d "$STUBUTILS_DIR" ] && [ $(find "$STUBUTILS_DIR" \( -name "*.h" -o -name "*.cpp" \) | wc -l) -ge 6 ]; then
         print_success "stub-ext 工具已存在且完整"
         return 0
     fi
@@ -229,7 +220,7 @@ copy_stub_ext() {
     # 从技能资源目录复制
     if [ -d "$SKILL_RESOURCE_DIR" ]; then
         cp -r "$SKILL_RESOURCE_DIR" "${AUTOTEST_ROOT}/3rdparty/"
-        local copied_files=$(find "$STUBUTILS_DIR" -name "*.h" -o -name "*.cpp" | wc -l)
+        local copied_files=$(find "$STUBUTILS_DIR" \( -name "*.h" -o -name "*.cpp" \) | wc -l)
         print_success "stub-ext 工具复制完成 (${copied_files} 个文件）"
         return 0
     else
@@ -461,7 +452,7 @@ function(ut_create_library_test lib_name source_dir)
     message(STATUS "UT: Creating library test: ${test_name}")
 
     # 查找测试文件
-    file(GLOB_RECURSE TEST_SOURCES FILES MATCHING PATTERN "*.cpp" "*.h")
+    file(GLOB_RECURSE TEST_SOURCES "*.cpp" "*.h")
 
     # 查找库源文件
     file(GLOB_RECURSE LIB_SOURCES
@@ -490,7 +481,7 @@ function(ut_create_plugin_test plugin_name plugin_path)
     message(STATUS "UT: Creating plugin test: ${test_name}")
 
     # 查找测试文件
-    file(GLOB_RECURSE TEST_SOURCES FILES MATCHING PATTERN "*.cpp" "*.h")
+    file(GLOB_RECURSE TEST_SOURCES "*.cpp" "*.h")
 
     # 查找插件源文件
     file(GLOB_RECURSE PLUGIN_SOURCES
@@ -519,7 +510,7 @@ function(ut_create_service_test service_name service_path)
     message(STATUS "UT: Creating service test: ${test_name}")
 
     # 查找测试文件
-    file(GLOB_RECURSE TEST_SOURCES FILES MATCHING PATTERN "*.cpp" "*.h")
+    file(GLOB_RECURSE TEST_SOURCES "*.cpp" "*.h")
 
     # 查找服务源文件（排除 main.cpp）
     file(GLOB_RECURSE SERVICE_SOURCES
@@ -555,7 +546,7 @@ CMAKEOF
 generate_main_cmake() {
     print_step 5 "生成测试主 CMakeLists.txt..."
 
-    cat > "${AUTOTEST_ROOT}/CMakeLists.txt" << CMAKEOF
+    cat > "${AUTOTEST_ROOT}/CMakeLists.txt" << CMAKEEOF
 # CMakeLists.txt for AutoTests
 cmake_minimum_required(VERSION 3.10)
 
@@ -566,7 +557,7 @@ project(autotests)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     
     # 设置 autotests 根目录
-    set(AUTOTEST_ROOT \${CMAKE_CURRENT_SOURCE_DIR})
+    set(AUTOTEST_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
     
     # 包含测试工具
     list(APPEND CMAKE_MODULE_PATH "\${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
@@ -714,7 +705,7 @@ copy_stub_from_resources() {
 
     # 检查是否已经存在且完整
     if [ -d "$STUBUTILS_DIR/cpp-stub" ] && [ -d "$STUBUTILS_DIR/stub-ext" ]; then
-        local stub_files=$(find "$STUBUTILS_DIR" -name "*.h" -o -name "*.cpp" | wc -l)
+        local stub_files=$(find "$STUBUTILS_DIR" \( -name "*.h" -o -name "*.cpp" \) | wc -l)
         if [ "$stub_files" -ge 6 ]; then
             print_success "stub-ext 工具已存在"
             return 0
@@ -724,7 +715,7 @@ copy_stub_from_resources() {
     # 从技能资源目录复制
     if [ -d "$SKILL_RESOURCE_DIR" ]; then
         cp -r "$SKILL_RESOURCE_DIR" "${SCRIPT_DIR}/3rdparty/"
-        local copied_files=$(find "$STUBUTILS_DIR" -name "*.h" -o -name "*.cpp" | wc -l)
+        local copied_files=$(find "$STUBUTILS_DIR" \( -name "*.h" -o -name "*.cpp" \) | wc -l)
         print_success "stub-ext 工具复制完成（${copied_files} 个文件）"
         return 0
     fi
@@ -858,9 +849,29 @@ SHELLEOF
 }
 
 ################################################################################
-# 生成示例测试
+# 生成文档
 ################################################################################
 
+generate_documentation() {
+    print_step 7 "生成文档..."
+
+    cat > "${AUTOTEST_ROOT}/README.md" << 'MDEOF'
+# AutoTest Framework
+
+## 快速开始
+
+### 1. 编写测试
+
+```cpp
+#include <gtest/gtest.h>
+#include "stubext.h"
+#include "myclass.h"
+
+class UT_MyClass : public testing::Test {
+public:
+    void SetUp() override {
+        obj = new MyClass();
+    }
 
     void TearDown() override {
         stub.clear();
@@ -884,14 +895,14 @@ TEST_F(UT_MyClass, Calculate_ValidInput_ReturnsCorrectResult) {
 }
 ```
 
-### 3. 运行测试
+### 2. 运行测试
 
 ```bash
 cd autotests
 ./run-ut.sh
 ```
 
-### 4. 从指定步骤开始
+### 3. 从指定步骤开始
 
 ```bash
 # 跳过编译，直接运行测试
