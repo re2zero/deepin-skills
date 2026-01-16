@@ -9,7 +9,7 @@ description: 为 Qt 项目生成单元测试框架。包含完整依赖、子 Ag
 
 1. **使用内置资源**：stub-ext 源码来自 `resources/stub/`，不使用外部下载
 2. **生成 autotests/ 目录**：与原 qt-cpp-unittest-framework 技能保持一致
-3. **调用子 Agent**：必须调用 `qt-unittest-builder` 完成分析和生成
+3. **调用内置子 Agent**：直接从 Skill 的 `agent/` 目录读取子 Agent，不安装到项目
 4. **子 Agent 权限**：子 Agent 必须有 `bash: true` 和 `write: allow` 权限
 5. **直接执行**：不使用 ask 工具询问用户，直接拷贝和写入
 
@@ -37,13 +37,19 @@ autotests/
 - `run-ut.sh`：测试运行脚本（设置执行权限）
 - `UnitTestUtils.cmake`：CMake 工具（写入到 `autotests/cmake/`）
 
-### 步骤 4：调用子 Agent
+### 步骤 4：调用内置子 Agent
 
-调用子 Agent `qt-unittest-builder`（从 Skill 的 `agent/` 目录读取）完成：
+直接使用 Skill 内置的子 Agent（从 `agent/qt-unittest-builder.md` 读取），无需安装：
+
+**调用方式**：
+将 Skill 的 `agent/qt-unittest-builder.md` 内容作为子 Agent 的提示词执行。
+
+**子 Agent 完成任务**：
 1. 分析项目结构（CMakeLists.txt、源码目录、依赖）
 2. 生成 autotests/CMakeLists.txt
 3. 生成测试子目录和测试文件
 4. 生成测试文档（README.md）
+5. **验证构建**：运行 cmake 配置和编译，确保测试框架可以正常运行
 
 ## Red Flags（停止信号）
 
@@ -53,6 +59,7 @@ autotests/
 - ❌ 请求使用外部 stub-ext 源码
 - ❌ 文档超过 500 词
 - ❌ 使用 ask 工具询问用户确认（浪费时间）
+- ❌ 尝试安装子 Agent 到项目（直接使用内置）
 - ❌ 子 Agent 权限为 `bash: false` 或 `write: ask`
 
 ## Quick Reference
@@ -89,6 +96,7 @@ permission:
 |------|------|------|
 | 子 Agent 无执行权限 | 配置错误 | 设置 `bash: true, write: allow` |
 | 询问用户确认 | 使用了 ask 工具 | 删除所有 ask 调用 |
+| 安装子 Agent 到项目 | 不必要的步骤 | 直接使用内置子 Agent |
 | 目录名错误 | 生成 tests/ | 必须生成 autotests/ |
 | 文档太长 | 包含过多细节 | 压缩到 <500 词 |
 
@@ -99,5 +107,5 @@ permission:
 | "详细文档有助于理解" | 用户只想快速完成 | 保持简洁，<500 词 |
 | "多个脚本提供灵活性" | 增加复杂性 | 固定脚本 + 动态 AI |
 | "询问用户确保安全" | 浪费时间 | 直接执行，子 Agent 有 write: allow |
-| "可选安装子 Agent" | 增加分支 | 直接使用内置版本 |
+| "安装子 Agent 到项目" | 增加步骤 | 直接使用 Skill 内置版本 |
 | "注意事项提醒重要点" | 重复冗余 | 用 Iron Laws 和 Red Flags |

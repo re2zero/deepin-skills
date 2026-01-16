@@ -90,7 +90,7 @@ cmake_minimum_required(VERSION 3.16)
 project(autotests VERSION 1.0.0 LANGUAGES CXX)
 
 # CMake 工具目录
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/autotests/cmake")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 # 初始化测试环境
 include(UnitTestUtils)
@@ -113,7 +113,7 @@ cmake_minimum_required(VERSION 3.16)
 project(autotests VERSION 1.0.0 LANGUAGES CXX)
 
 # CMake 工具目录
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/autotests/cmake")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 # 初始化测试环境
 include(UnitTestUtils)
@@ -454,9 +454,35 @@ genhtml coverage.filtered --output-directory coverage-html
 
 ### 步骤 7：写入文件
 
-使用 write 工具写入所有生成的文件。使用 ask 工具在写入前询问用户确认。
+使用 write 工具直接写入所有生成的文件（不使用 ask 询问）。
 
-### 步骤 8：反馈用户
+### 步骤 8：验证构建
+
+**必须验证**：运行 CMake 配置和编译，确保测试框架可以正常运行。
+
+**验证步骤**：
+1. 使用 bash 工具创建临时构建目录：`mkdir build-autotests`
+2. 运行 CMake 配置：
+   ```bash
+   cd build-autotests
+   cmake .. -DBUILD_TESTS=ON
+   ```
+3. 尝试编译：
+   ```bash
+   cmake --build . -j$(nproc)
+   ```
+4. **如果失败**：
+   - 分析错误信息
+   - 修正生成的 CMakeLists.txt
+   - 修正测试代码
+   - 重新验证直到成功
+
+**注意**：
+- 验证是必须的，不能跳过
+- 验证成功后才反馈用户
+- 如果验证失败，子 Agent 必须自我修正并重试
+
+### 步骤 9：反馈用户
 
 ```
 ✓ 单元测试框架生成完成！
@@ -471,6 +497,8 @@ project-root/
     ├── run-ut.sh
     ├── README.md
     └── [测试子目录...]
+
+✓ 已验证：CMake 配置和编译成功，测试框架可以正常运行！
 
 下一步：
 
@@ -487,11 +515,6 @@ project-root/
   ./run-ut.sh
 
 测试框架：{{{TEST_FRAMEWORK_NAME}}}
-
-提示：
-- 所有依赖已安装到 autotests/3rdparty/stub/
-- CMake 工具已生成到 autotests/cmake/
-- 测试脚本已生成，可以直接使用
 ```
 
 ## 注意事项
@@ -501,3 +524,5 @@ project-root/
 3. **动态生成**：CMakeLists.txt 和测试文件根据项目结构动态生成
 4. **测试框架**：支持 Qt Test、Google Test、Catch2
 5. **模块化支持**：自动识别项目模块，生成对应的测试子目录
+6. **必须验证**：验证构建是必须的，确保测试框架可以正常运行
+7. **自我修正**：如果验证失败，子 Agent 必须自我修正并重试
