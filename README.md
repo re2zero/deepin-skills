@@ -42,108 +42,7 @@ This directory contains a collection of skills for deepin project development, c
 4. 用户确认 → write 工具询问确认
 5. 完成 → 提供构建和运行命令
 
-**与 qt-cpp-unittest-framework 对比**:
-- ✅ 1句话 vs 5-6步手动流程
-- ✅ 扁平化 vs 多脚本 + 占位符
-- ✅ 内置模板 vs 模板文件 + 手动替换
-- ✅ 自动 AI vs 手动 AI 交互
-- ✅ 单文件维护 vs 多文件同步
-
-#### [qt-cpp-unittest-framework](qt-cpp-unittest-framework/)（已过时）
-
-**Purpose**: Generate Google Test framework with stub-ext mock tools and AI-assisted CMake configuration for Qt/C++ projects.
-
-**When to use**: User requests setting up unit test infrastructure, generating autotest framework, or initializing Google Test framework for Qt/C++ CMake projects.
-
-**Key features (v5.0.0)**:
-- **AI-assisted CMakeLists.txt generation**: Analyzes project dependencies, structure, and includes to generate adaptive configuration
-- **Universal directory structure support**: Adapts to actual project structure (components, modules, apps, application, src, libs, etc.)
-- **Local stub-ext resources**: Bundled with skill, no external downloads required
-- **Fixed process automation**: Scripts handle directories, stub tools, test runners, and prompt generation
-- **Smart project detection**: Supports diverse source directory names and flat/nested structures
-- **AI prompt templates**: Provides structured prompts for AI-based project analysis and CMake generation
-
-**Resources**:
-- `SKILL.md` - Complete skill documentation (v5.0.0)
-- `setup-autotest-framework.sh` - Framework generation script (v5.0.0)
-- `scripts/detect-project.sh` - Enhanced project detection (supports 9+ directory types)
-- `scripts/copy-stubs.sh` - Stub tools copy
-- `scripts/generate-cmake-utils.sh` - CMake utilities (outputs to autotests/cmake/)
-- `scripts/generate-runner.sh` - Test runner generation
-- `scripts/generate-readme.sh` - README generation
-- `ai-prompts/analyze-project.md` - AI prompt for project analysis
-- `ai-prompts/generate-cmake.md` - AI prompt for CMakeLists.txt generation
-- `OPTIMIZATION_SUMMARY.md` - Detailed optimization summary and verification results
-- `QUICK_START.md` - Quick start guide for users
-
-**Usage**:
-```bash
-# Generate base framework
-/path/to/qt-cpp-unittest-framework/setup-autotest-framework.sh -p /path/to/project
-
-# Review AI prompts
-cd /path/to/project/autotests
-cat .ai_prompts/analyze-project.md    # See detected structure
-cat .ai_prompts/generate-cmake.md       # See CMake generation rules
-
-# Use AI to analyze and generate CMakeLists.txt
-# (See QUICK_START.md for detailed steps)
-
-# Run tests
-./run-ut.sh
-```
-
-**v5.0.0 Improvements**:
-- ✅ Removed hardcoded libs/plugins/services assumptions
-- ✅ Added support for 9+ source directory types (application, apps, base, common, controls, components)
-- ✅ Extended file extensions (.cc, .hpp, .cxx)
-- ✅ Handles flat source structures (no subdirectories)
-- ✅ Handles special cases (source directory has no submodules with sources)
-- ✅ Moved UnitTestUtils.cmake to autotests/cmake/ (logical location)
-- ✅ Enhanced exclusion rules (build, cmake, debian, doc*, assets, resources)
-- ✅ AI-based CMakeLists.txt generation (adaptive to project)
-- ✅ Comprehensive documentation (optimization summary, quick start guide)
-
-**Supported Project Structures**:
-- Standard: `src/module1/`, `src/module2/`
-- Flat: `src/*.cpp`, `src/*.h`
-- Functional: `application/*.cpp`, `application/module/`
-- Type-based: `base/`, `common/`, `controls/`
-- Component-based: `components/`, `modules/`
-- Mixed: Multiple source directories in project root
-
-**Known Limitations**:
-- Test subdirectories (`autotests/module/`) not auto-created (requires AI generation)
-- CMakeLists.txt files not auto-generated (requires AI execution)
-- Multi-source directories detected (first one used primarily)
-- Third-party dependencies detected by AI analysis (not script)
-
-#### [qt-cpp-unittest-generation](qt-cpp-unittest-generation/)
-
-**Purpose**: Generate comprehensive unit tests using LSP tools to analyze class structure and create precise stubs.
-
-**When to use**: User requests generating unit tests for specific classes, writing test cases, or creating test files for Qt/C++ classes.
-
-**Key features**:
-- LSP-based class analysis (lsp_document_symbols, lsp_goto_definition)
-- Business logic understanding from implementation files
-- Precise stub generation with correct function signatures
-- Virtual function stubbing (VADDR macro)
-- Overloaded function stubbing (static_cast)
-- UI method stubbing (QWidget::show, QDialog::exec)
-
-**Resources**:
-- `SKILL.md` - Skill documentation
-
-**Usage**:
-```bash
-# AI automatically uses LSP tools:
-lsp_document_symbols src/myclass.h
-lsp_goto_definition src/myclass.cpp ClassName::methodName
-lsp_find_references src/myclass.h ClassName
-```
-
-#### [qt-unittest-make](qt-unittest-make/) ⭐ **新增**
+#### [qt-unittest-make](qt-unittest-make/) ⭐ **推荐**
 
 **Purpose**: 为 Qt 项目生成单元测试代码，使用 LSP 分析类结构，自动生成 100% 函数覆盖率的测试用例。支持模块批量生成和单个类增量补全。
 
@@ -256,21 +155,19 @@ python -m subagent.translation_subagent --config config.json --strings "Hello" "
 
 ## Testing Workflow
 
-1. **Generate framework** (qt-cpp-unittest-framework):
-   ```bash
-   setup-autotest-framework.sh -p /path/to/project
-   cd autotests
-   ./run-ut.sh
+1. **Generate framework** (qt-unittest-build):
+   ```
+   请为当前项目生成单元测试框架
    ```
 
-2. **Generate tests for classes** (qt-cpp-unittest-generation):
-   - User: "Generate tests for MyClass"
-   - AI: Uses LSP tools → Analyzes class → Generates precise stubs → Creates test file
+2. **Generate tests for classes** (qt-unittest-make):
+   - User: "为 src/lib/ui 模块创建单元测试"
+   - AI: Uses LSP tools → Analyzes class → Generates tests (100% coverage) → Validates build
 
 3. **Run tests**:
    ```bash
-   cd autotests
-   ./run-ut.sh
+   cd build-autotests
+   ctest --output-on-failure
    ```
 
 ## File Structure
@@ -278,21 +175,18 @@ python -m subagent.translation_subagent --config config.json --strings "Hello" "
 ```
 deepin-skills/
 ├── README.md                                  # This file
-├── qt-cpp-unittest-framework/                   # Framework generation skill
-│   ├── SKILL.md                               # Skill documentation (<500 words)
-│   ├── setup-autotest-framework.sh             # Script (uses local resources)
-│   └── resources/testutils/                   # Bundled stub-ext source
-│       ├── cpp-stub/
-│       │   ├── stub.h
-│       │   ├── addr_any.h
-│       │   ├── addr_pri.h
-│       │   └── elfio.hpp
-│       └── stub-ext/
-│           ├── stubext.h
-│           ├── stub-shadow.h
-│           └── stub-shadow.cpp
-└── qt-cpp-unittest-generation/                # Test generation skill
-    └── SKILL.md                               # Skill documentation (<500 words)
+├── qt-unittest-build/                         # Framework generation skill
+│   ├── SKILL.md                               # Skill documentation
+│   ├── .opencode/agent/qt-unit-test-executor.md  # Subagent
+│   └── README.md                              # Detailed usage documentation
+├── qt-unittest-make/                          # Test generation skill
+│   ├── SKILL.md                               # Skill documentation
+│   ├── agent/unittest-generator.md            # Subagent
+│   └── README.md                              # Detailed usage documentation
+└── qt-translation-assistant/                  # Translation assistant skill
+    ├── SKILL.md                               # Skill documentation
+    ├── translate.py                           # Main script
+    └── subagent/                              # Translation subagent module
 ```
 
 ## Adding New Skills
@@ -330,8 +224,9 @@ Each skill includes:
 
 ## Token Efficiency
 
-- qt-cpp-unittest-framework: **414 words**
-- qt-cpp-unittest-generation: **485 words**
+- qt-unittest-build: <500 words
+- qt-unittest-make: <500 words
+- qt-translation-assistant: <500 words
 
 All under 500-word limit for efficient context usage.
 
