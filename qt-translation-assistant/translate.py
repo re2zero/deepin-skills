@@ -2,11 +2,9 @@
 import os
 import json
 import re
-import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List
-from xml.etree import ElementTree as ET
 import time
 import threading
 
@@ -31,9 +29,7 @@ class TranslationWorker:
                 if len(results) == len(strings_list):
                     return results
                 else:
-                    print(f"  Warning: Result count mismatch")
-                    print(f"    Expected {len(strings_list)}, got {len(results)}")
-                    print(f"    Sample result: {results[0] if results else 'none'}")
+                    print(f"  Warning: Result count mismatch (expected {len(strings_list)}, got {len(results)})")
 
             except requests.exceptions.RequestException as e:
                 if attempt < self.max_retries - 1:
@@ -71,6 +67,8 @@ Important notes:
         return prompt
 
     def _call_llm_api(self, prompt: str) -> str:
+        import requests
+        
         headers = {
             'Content-Type': 'application/json',
             'Authorization': f"Bearer {self.config['api_key']}"
@@ -118,7 +116,6 @@ Important notes:
                 pass
 
         print("  Warning: Unable to parse translation response")
-        print(f"  Response: {response_text[:500]}")
         return [{'source': s, 'translation': s} for s in original_strings]
 
 
@@ -145,39 +142,50 @@ class QtTranslationAssistant:
             return json.load(f)
 
     def find_unfinished_translations(self, ts_file_path: str) -> List[Dict]:
-        try:
-            with open(ts_file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+        results = []
+        
+        with open(ts_file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
 
-            ts_match = re.search(r'(<!DOCTYPE[^>]*>\s*)?<TS[^>]*>.*</TS>', content, re.DOTALL)
-            if ts_match:
-                content = ts_match.group(0)
-
-            content = content.replace(' encoding="UTF-8"', '')
-
-            import io
-            tree = ET.parse(io.StringIO(content))
-            root = tree.getroot()
-
-            results = []
-            for context in root.findall('context'):
-                context_name = context.find('name').text if context.find('name') is not None else 'Unknown'
-
-                for message in context.findall('message'):
-                    translation_elem = message.find('translation')
-                    if translation_elem is not None and translation_elem.get('type') == 'unfinished':
-                        source_elem = message.find('source')
-                        if source_elem is not None:
+        current_source = None
+        
+        for line_num, line in enumerate(lines, 1):
+            source_match = re.search(r'<source>([^<]+)</source>', line)
+            if source_match:
+                current_source = source_match.group(1)
+                continue
+            
+            if current_source and '<translation' in line:
+                has_unfinished_marker = False
+                if 'type="unfinished"' in line or "type='unfinished'" in line:
+                    has_unfinished_marker = True
+                
+                if has_unfinished_marker:
+                    if '</translation>' in line or '/>' in line:
+                        results.append({
+                            'source': current_source,
+                            'translation': '',
+                            'line_number': line_num,
+                            'end_line_number': line_num,
+                            'file_path': ts_file_path
+                        })
+                    else:
+                        end_line_num = line_num
+                        while end_line_num < len(lines) and '</translation>' not in lines[end_line_num]:
+                            end_line_num += 1
+                            if end_line_num > line_num + 20:
+                                break
+                        if end_line_num < len(lines):
                             results.append({
-                                'source': source_elem.text or '',
+                                'source': current_source,
                                 'translation': '',
-                                'context': context_name
+                                'line_number': line_num,
+                                'end_line_number': end_line_num,
+                                'file_path': ts_file_path
                             })
+                    current_source = None
 
-            return results
-        except Exception as e:
-            print(f"  Parse failed {ts_file_path}: {str(e)}")
-            return []
+        return results
 
     def get_language_from_filename(self, filename: str) -> str:
         name = Path(filename).stem
@@ -187,14 +195,17 @@ class QtTranslationAssistant:
                 return '_'.join(parts[1:])
         return 'unknown'
 
-    def translate_single_file(self, ts_file_path: str):
+    def translate_single_file(self, ts_file_path: str) -> dict:
         print(f"\nProcessing: {ts_file_path}")
 
         unfinished_items = self.find_unfinished_translations(ts_file_path)
 
         if not unfinished_items:
-            print("  No unfinished translations found")
-            return
+            return {
+                'file': ts_file_path,
+                'status': 'skipped',
+                'count': 0
+            }
 
         print(f"  Found {len(unfinished_items)} unfinished translations")
 
@@ -206,13 +217,24 @@ class QtTranslationAssistant:
             translation_results = []
             for item in unfinished_items:
                 translation_results.append({'source': item['source'], 'translation': item['source']})
-            self.write_translations_back(ts_file_path, translation_results)
-            return
+            self.write_translations_back(ts_file_path, unfinished_items, translation_results)
+            return {
+                'file': ts_file_path,
+                'status': 'completed',
+                'count': len(translation_results)
+            }
 
         batches = self._create_batches(unfinished_items, ts_file_path, language_code)
         translation_results = self._translate_batches_parallel(batches)
-        self.write_translations_back(ts_file_path, translation_results)
+        self.write_translations_back(ts_file_path, unfinished_items, translation_results)
         print(f"  Translation complete: {len(translation_results)} strings")
+        
+        return {
+            'file': ts_file_path,
+            'status': 'completed',
+            'count': len(translation_results),
+            'language': language_code
+        }
 
     def _create_batches(self, items: List[Dict], source_file: str,
                         target_language: str) -> List[TranslationBatch]:
@@ -259,42 +281,75 @@ class QtTranslationAssistant:
 
         return results
 
-    def write_translations_back(self, ts_file_path: str, translation_results: List[Dict]):
+    def write_translations_back(self, ts_file_path: str, unfinished_items: List[Dict], translation_results: List[Dict]):
         with open(ts_file_path, 'r', encoding='utf-8') as f:
-            original_content = f.read()
-
-        tree = ET.parse(ts_file_path)
-        root = tree.getroot()
+            lines = f.readlines()
 
         translation_map = {item['source']: item['translation'] for item in translation_results}
 
-        for message in root.iter('message'):
-            source_elem = message.find('source')
-            translation_elem = message.find('translation')
-
-            if (source_elem is not None and translation_elem is not None and
-                translation_elem.get('type') == 'unfinished'):
-
-                source_text = source_elem.text or ''
-                if source_text in translation_map:
-                    del translation_elem.attrib['type']
-                    translation_elem.text = translation_map[source_text]
-
-        import io
-        output = io.BytesIO()
-        tree.write(output, encoding='utf-8', xml_declaration=True)
-        new_content = output.getvalue().decode('utf-8')
-
-        ts_start = original_content.find('<TS')
-        new_ts_start = new_content.find('<TS')
-        ts_end = original_content.find('</TS>') + 6
-
-        final_content = original_content[:ts_start] + new_content[new_ts_start:]
+        modified_count = 0
+        for item in unfinished_items:
+            source_text = item['source']
+            if source_text not in translation_map:
+                print(f"  Warning: No translation found for: {source_text}")
+                continue
+            
+            new_translation = translation_map[source_text]
+            line_num = item['line_number'] - 1
+            end_line_num = item['end_line_number'] - 1
+            
+            if line_num >= len(lines) or end_line_num >= len(lines):
+                print(f"  Warning: Invalid line numbers: {line_num+1} to {end_line_num+1}")
+                continue
+            
+            original_line = lines[line_num]
+            
+            unfinished_patterns = [
+                r'<translation type="unfinished">\s*</translation>',
+                r'<translation type="unfinished"\s*</translation>',
+                r"<translation type='unfinished'>\s*</translation>",
+                r'<translation type="unfinished"\s*/>',
+                r"<translation type='unfinished'\s*/>",
+            ]
+            
+            is_unfinished = any(re.search(pattern, original_line) for pattern in unfinished_patterns)
+            
+            if not is_unfinished:
+                print(f"  Warning: Line {line_num+1} doesn't contain unfinished marker")
+                continue
+            
+            if end_line_num == line_num:
+                new_line = re.sub(
+                    r'<translation[^>]*type=["\']unfinished["\'][^>]*>\s*</translation>',
+                    f'<translation>{new_translation}</translation>',
+                    original_line
+                )
+                if new_line == original_line:
+                    new_line = re.sub(
+                        r'<translation[^>]*type=["\']unfinished["\'][^>]*\s*/>',
+                        f'<translation>{new_translation}</translation>',
+                        original_line
+                    )
+                lines[line_num] = new_line
+            else:
+                new_line = re.sub(
+                    r'<translation[^>]*type=["\']unfinished["\'][^>]*>',
+                    f'<translation>{new_translation}',
+                    original_line
+                )
+                lines[line_num] = new_line
+                
+                for i in range(line_num + 1, end_line_num):
+                    lines[i] = ''
+            
+            modified_count += 1
 
         with open(ts_file_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
+            f.writelines(lines)
+        
+        print(f"  Wrote {modified_count} translations back to file")
 
-    def process_directory(self, directory_path: str):
+    def process_directory(self, directory_path: str) -> dict:
         ts_files = list(Path(directory_path).glob('*.ts'))
         print(f"\nFound {len(ts_files)} TS files")
 
@@ -304,35 +359,59 @@ class QtTranslationAssistant:
         ]
         print(f"Filtered {len(filtered_files)} files to translate\n")
 
-        total_translated = 0
-        success_count = 0
-        failed_files = []
+        report = {
+            'total_files': len(filtered_files),
+            'translated_files': [],
+            'skipped_files': [],
+            'failed_files': [],
+            'total_strings': 0,
+            'files_detail': []
+        }
 
         start_time = time.time()
 
         for ts_file in filtered_files:
-            try:
-                original_count = len(self.find_unfinished_translations(str(ts_file)))
-                self.translate_single_file(str(ts_file))
-                success_count += 1
-                total_translated += original_count
-            except Exception as e:
-                print(f"  Error processing {ts_file}: {str(e)}")
-                failed_files.append(str(ts_file))
+            result = self.translate_single_file(str(ts_file))
+            report['total_strings'] += result['count']
+            
+            if result['status'] == 'completed':
+                report['translated_files'].append(ts_file.name)
+                report['files_detail'].append({
+                    'file': ts_file.name,
+                    'count': result['count'],
+                    'language': result['language']
+                })
+            elif result['status'] == 'skipped':
+                report['skipped_files'].append(ts_file.name)
+            else:
+                report['failed_files'].append(ts_file.name)
 
         elapsed = time.time() - start_time
 
         print("\n" + "=" * 50)
-        print("Translation Statistics:")
-        print(f"  Success: {success_count}/{len(filtered_files)} files")
-        print(f"  Total translated: {total_translated} strings")
-        print(f"  Time elapsed: {elapsed:.2f} seconds")
-        print(f"  Average speed: {total_translated/elapsed:.1f} strings/sec")
-        if failed_files:
-            print(f"  Failed files: {len(failed_files)}")
-            for f in failed_files:
-                print(f"    - {f}")
+        print("Translation Summary Report")
         print("=" * 50)
+        print(f"  Total files processed: {report['total_files']}")
+        print(f"  Successfully translated: {len(report['translated_files'])}")
+        print(f"  Skipped (no translation needed): {len(report['skipped_files'])}")
+        print(f"  Failed: {len(report['failed_files'])}")
+        print(f"  Total strings translated: {report['total_strings']}")
+        print(f"  Time elapsed: {elapsed:.2f} seconds")
+        if report['total_strings'] > 0:
+            print(f"  Average speed: {report['total_strings']/elapsed:.1f} strings/sec")
+        
+        print("\nTranslated files:")
+        for detail in report['files_detail']:
+            print(f"  - {detail['file']}: {detail['count']} strings ({detail['language']})")
+        
+        if report['failed_files']:
+            print("\nFailed files:")
+            for f in report['failed_files']:
+                print(f"  - {f}")
+        
+        print("=" * 50)
+        
+        return report
 
 
 def main():
@@ -346,22 +425,8 @@ def main():
                         help='Number of strings per batch (default 20)')
     parser.add_argument('--max-workers', type=int, default=3,
                         help='Number of parallel workers (default 3)')
-    parser.add_argument('--create-config', action='store_true',
-                        help='Create config file template')
 
     args = parser.parse_args()
-
-    if args.create_config:
-        config = {
-            "api_url": "http://localhost:8080/v1/chat/completions",
-            "api_key": "your-api-key-here",
-            "model": "qwen3-coder-flash",
-            "temperature": 0.3
-        }
-        with open(args.config, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
-        print(f"Config created: {args.config}")
-        return
 
     try:
         assistant = QtTranslationAssistant(
@@ -371,7 +436,8 @@ def main():
         )
 
         if os.path.isfile(args.path):
-            assistant.translate_single_file(args.path)
+            result = assistant.translate_single_file(args.path)
+            print(f"\nResult: {result['status']} - {result['count']} strings")
         elif os.path.isdir(args.path):
             assistant.process_directory(args.path)
         else:

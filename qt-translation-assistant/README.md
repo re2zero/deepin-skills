@@ -4,11 +4,11 @@ Automated translation tool for Qt projects using AI models to translate TS (Tran
 
 ## Features
 
-- **Smart Parsing**: Identifies incomplete translations in Qt TS files
+- **Smart Parsing**: Identifies incomplete translations in Qt TS files (detects all unfinished formats)
 - **AI-Powered Translation**: Uses advanced language models for accurate translations
 - **Parallel Processing**: Multi-threaded batch translation using ThreadPoolExecutor
 - **Batch Optimization**: Configurable batch size for optimal API usage
-- **Minimal Changes**: Only modifies translation text, preserving original file format
+- **100% Format Preservation**: Line-number based replacement preserves ALL original formatting (quotes, spaces, indentation)
 - **Error Isolation**: Single batch failure doesn't affect others
 - **Retry Logic**: Automatic retries with exponential backoff
 
@@ -79,10 +79,20 @@ Typical performance:
 
 ## Git Diff Friendly
 
-Only translation content is modified:
+Only translation content is modified (100% format preservation):
 - `type="unfinished"` removed from `<translation>` tags
 - Translation text updated
 - Original XML structure and formatting preserved
+- Quote style (single/double) unchanged
+- Whitespace and indentation unchanged
+- Line endings and encoding unchanged
+
+Supported unfinished formats:
+- `<translation type="unfinished"></translation>`
+- `<translation type="unfinished" />`
+- `<translation type='unfinished'></translation>`
+- `<translation type='unfinished' />`
+- Multi-line translations with preserved formatting
 
 ## Troubleshooting
 

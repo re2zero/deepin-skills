@@ -86,48 +86,41 @@ This directory contains a collection of skills for deepin project development, c
 
 ### Qt Translation Assistant Skills
 
-#### [qt-translation-assistant](qt-translation-assistant/)
+#### [qt-translation-assistant](qt-translation-assistant/) ⭐ **推荐**
 
-**Purpose**: Automated translation tool for Qt projects using AI models to translate TS (Translation Source) files with subagent architecture.
+**Purpose**: Automated translation tool for Qt projects using AI models to translate TS (Translation Source) files with parallel processing and 100% format preservation.
 
 **When to use**: User requests translating Qt project localization files (TS files), automating translation workflows, or setting up multilingual support for Qt applications.
 
 **Key features**:
-- Smart parsing of TS files to identify incomplete translations
-- Subagent architecture for improved performance and error isolation
-- Support for multiple AI providers (OpenAI, Anthropic, DeepSeek, local servers)
-- Batch processing for efficient translation of multiple strings
-- Language-specific translation guidance (scripts, RTL, etc.)
-- Consistency preservation across translations
+- **Smart parsing**: Detects all unfinished translation formats (single-line, multi-line, self-closing)
+- **100% format preservation**: Line-number based replacement preserves all original formatting
+- **Parallel processing**: ThreadPoolExecutor with configurable batch size and workers
+- **Error isolation**: Single batch failure doesn't affect others
+- **Retry logic**: Automatic retries with exponential backoff
+- **Support multiple AI providers**: OpenAI, Anthropic, DeepSeek, local servers
 
 **Architecture**:
-- **Main Skill**: Handles TS file parsing and result writing
-- **Translation Subagent**: Handles AI API calls independently
-- **Coordinator**: Manages communication between main skill and subagent
+- **TranslationWorker**: Handles AI API calls with retry logic
+- **QtTranslationAssistant**: Main orchestration with parallel batch processing
+- **Line-number based replacement**: Ensures 100% format preservation
 
 **Resources**:
 - `SKILL.md` - Skill documentation
-- `translate.py` - Main script with subagent architecture
-- `subagent/` - Translation subagent module
-- `config_tool.py` - Interactive configuration tool
-- `config_template.json` - Configuration template
+- `translate.py` - Main script with parallel processing
+- `README.md` - Detailed usage documentation
+- `test_format_preservation.py` - Format preservation test script
 
 **Usage**:
 ```bash
 # Translate entire directory of TS files
-python translate.py /path/to/ts/files/
+python translate.py /path/to/ts/files/ --batch-size 30 --max-workers 3
 
 # Translate specific file
-python translate.py /path/to/ts/files/ /path/to/specific/file.ts
-
-# With custom batch size
-python translate.py --batch-size 20 /path/to/ts/files/
+python translate.py /path/to/specific/file.ts
 
 # Create configuration file
-python translate.py --config
-
-# Direct subagent usage
-python -m subagent.translation_subagent --config config.json --strings "Hello" "World" --language zh-CN
+python translate.py --create-config
 ```
 
 ## Dependencies
@@ -183,10 +176,11 @@ deepin-skills/
 │   ├── SKILL.md                               # Skill documentation
 │   ├── agent/unittest-generator.md            # Subagent
 │   └── README.md                              # Detailed usage documentation
-└── qt-translation-assistant/                  # Translation assistant skill
-    ├── SKILL.md                               # Skill documentation
-    ├── translate.py                           # Main script
-    └── subagent/                              # Translation subagent module
+ └── qt-translation-assistant/                  # Translation assistant skill
+     ├── SKILL.md                               # Skill documentation
+     ├── translate.py                           # Main script with parallel processing
+     ├── README.md                              # Detailed usage documentation
+     └── test_format_preservation.py            # Format preservation test
 ```
 
 ## Adding New Skills
