@@ -73,6 +73,8 @@ fi
 
 ### Step 2: Determine Target Version
 
+**Default behavior**: If no version specified, auto-increment patch version (e.g., 6.5.26 → 6.5.27)
+
 **If version specified:**
 ```bash
 TARGET_VERSION="$1"  # e.g., 6.5.47
@@ -82,7 +84,7 @@ TARGET_VERSION="$1"  # e.g., 6.5.47
 ```bash
 # Extract current version from changelog
 CURRENT_VERSION=$(head -1 debian/changelog | sed -n 's/.*(\(.*\)).*/\1/p')
-# Extract and increment patch version
+# Extract and increment patch version (only increments patch: X.Y.Z → X.Y.Z+1)
 MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
 MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
 PATCH=$(echo $CURRENT_VERSION | cut -d. -f3)
@@ -91,14 +93,19 @@ TARGET_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
 
 ### Step 3: Generate Change Summary
 
-```bash
-# Find last version tag
-LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+**IMPORTANT**: Get commits from current changelog version (NOT from git tags, as tags may not always be created).
 
-# Get commit titles since last tag (note: two spaces before *)
-if [ -n "$LAST_TAG" ]; then
-    CHANGES=$(git log ${LAST_TAG}..HEAD --pretty=format:"  * %s")
+```bash
+# Extract date from first author line in changelog
+# Format: "Mon, 05 Jan 2026 15:29:58 +0800"
+# This finds the line starting with " -- " and extracts the date part
+CURRENT_DATE=$(grep -m1 "^ -- " debian/changelog | sed 's/.*  //')
+
+# Get commit titles since that date (note: two spaces before *)
+if [ -n "$CURRENT_DATE" ]; then
+    CHANGES=$(git log --since="${CURRENT_DATE}" --pretty=format:"  * %s")
 else
+    # Fallback: get recent commits if date extraction fails
     CHANGES=$(git log --pretty=format:"  * %s" -10)
 fi
 
@@ -222,6 +229,7 @@ Log : bump version to ${TARGET_VERSION}"
 | Mistake | Why It's Wrong | Fix |
 |---------|----------------|-----|
 | Creating git tags | This skill only commits, does not tag | Use separate command for git tag creation |
+| Using git tags for change summary | Git tags may not exist for all releases | Use changelog date instead |
 | Updating all parts of linglong version | Only first three parts should change | Use `X.Y.Z.1` pattern, not full version |
 | Missing git user.email | Author information required for changelog | Configure `git config user.email` |
 | Using "Release" in commit | Wrong commit message format | Use "chore: update version to X.Y.Z" |
@@ -230,6 +238,7 @@ Log : bump version to ${TARGET_VERSION}"
 ## Red Flags - STOP and Check
 
 - Commit message doesn't follow exact format
+- Using git tags instead of changelog for change summary
 - linglong.yaml version changes all four parts
 - Missing git user.email configuration
 - debian/changelog doesn't exist
