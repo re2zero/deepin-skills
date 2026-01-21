@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains a collection of skills for deepin project development, covering Qt/C++ development, translation management, and release automation.
+This directory contains a collection of skills for deepin project development, covering Git workflow, Qt/C++ development, translation management, and release automation.
 
 ## Skills Directory
 
@@ -123,6 +123,70 @@ python translate.py /path/to/specific/file.ts
 python translate.py --create-config
 ```
 
+### Git Workflow Skills
+
+#### [git-commit-workflow](git-commit-workflow/) ⭐ **推荐**
+
+**Purpose**: 智能化的 Git 提交流程工具，支持中文团队规范，包含 PMS 单号和 GitHub Issue 追踪功能。
+
+**When to use**: 用户请求提交代码、查看 git 状态、暂存文件，或需要生成符合团队规范的提交信息时。
+
+**Key features**:
+- **零脚本依赖**: 仅使用 git 命令，完全通用，无编译和脚本依赖
+- **智能解析**: AI 自动识别并解析 PMS URL 和 GitHub Issue URL
+- **结构化提交**: 生成符合规范的中英文双语提交信息
+- **强制确认**: 用户完全掌控提交内容，绝不出错
+- **格式约束**: Body 行不超过 80 字符，中英文成对出现
+- **完全通用**: 任何支持 Bash 工具的 AI Agent 都可使用
+
+**提交信息格式**:
+```
+<type>[optional scope]: <English description>
+
+[English body - optional, max 80 chars per line]
+
+[Chinese body - optional, max 80 chars per line, must pair with English]
+
+Log: <简洁的中文描述>
+PMS: <BUG-number or TASK-number>
+Issue: Fixes #<number> or owner/repo#<number>
+Influence: <用中文说明影响范围>
+```
+
+**智能解析能力**:
+- PMS 单号：从 URL 或直接输入中自动提取（BUG-XXXXX/TASK-XXXXX）
+- GitHub Issue：从 URL 或简写格式智能解析完整 Issue 标识
+- 仓库上下文：通过 `git remote get-url origin` 推断仓库名
+
+**Resources**:
+- `SKILL.md` - 技能文档（工作流程指南）
+- `README.md` - 详细使用文档
+- `templates/commit-examples.md` - 提交格式示例和类型参考
+
+**Usage**:
+```bash
+# 在 OpenCode 中直接输入
+帮我提交代码
+commit changes
+
+# 或显式调用
+使用 git-commit-workflow 技能
+```
+
+**执行流程**:
+1. 检查状态 → git status
+2. 选择文件 → 交互式暂存
+3. 查看差异 → git diff --staged
+4. 生成草稿 → AI 智能解析 PMS/Issue
+5. 用户确认 → 用户修改或确认
+6. 执行提交 → git commit -m "<message>"
+
+**关键特性**:
+- ✅ 零依赖（仅 git 命令）
+- ✅ AI 智能解析（无需脚本处理 URL）
+- ✅ 强制确认（绝不自动提交）
+- ✅ 格式约束（80 字符限制、中英文双语）
+
 ### Release Management Skills
 
 #### [create-release-tags](create-release-tags/)
@@ -171,6 +235,15 @@ prepare for release
 
 ## Dependencies
 
+### Git Workflow Skill
+
+**System requirements**:
+- git (any version with standard CLI commands)
+
+**AI Agent requirements**:
+- Bash tool support
+- Natural language understanding for URL parsing
+
 ### Framework Skill
 
 **Script dependencies**:
@@ -207,25 +280,45 @@ prepare for release
 ## Testing Workflow
 
 1. **Generate framework** (qt-unittest-build):
-   ```
-   请为当前项目生成单元测试框架
-   ```
+    ```
+    请为当前项目生成单元测试框架
+    ```
 
 2. **Generate tests for classes** (qt-unittest-make):
-   - User: "为 src/lib/ui 模块创建单元测试"
-   - AI: Uses LSP tools → Analyzes class → Generates tests (100% coverage) → Validates build
+    - User: "为 src/lib/ui 模块创建单元测试"
+    - AI: Uses LSP tools → Analyzes class → Generates tests (100% coverage) → Validates build
 
 3. **Run tests**:
-   ```bash
-   cd build-autotests
-   ctest --output-on-failure
-   ```
+    ```bash
+    cd build-autotests
+    ctest --output-on-failure
+    ```
+
+## Git Workflow
+
+1. **Check git status**:
+    ```
+    查看git状态
+    ```
+
+2. **Commit changes**:
+    ```
+    帮我提交代码
+    ```
+    - User: Selects files to stage
+    - AI: Analyzes changes → Generates structured commit message → Parses PMS/Issue
+    - User: Confirms or edits the commit message
+    - AI: Executes `git commit`
 
 ## File Structure
 
 ```
 deepin-skills/
 ├── README.md                                  # This file
+├── git-commit-workflow/                       # Git workflow skill
+│   ├── SKILL.md                               # Skill documentation
+│   ├── README.md                              # Detailed usage documentation
+│   └── templates/commit-examples.md           # Commit format examples
 ├── qt-unittest-build/                         # Framework generation skill
 │   ├── SKILL.md                               # Skill documentation
 │   ├── .opencode/agent/qt-unit-test-executor.md  # Subagent
