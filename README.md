@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains a collection of skills for deepin project development, covering Git workflow, Qt/C++ development, translation management, and release automation.
+This directory contains a collection of skills for deepin project development, covering Git workflow, Qt/C++ development, translation management, release automation, and GitHub code review reporting.
 
 ## Skills Directory
 
@@ -280,6 +280,121 @@ prepare for release
 6. Update all linglong.yaml files (X.Y.Z.N → X.Y.Z.N)
 7. Create commit with standard message format
 
+### GitHub Review Skills
+
+#### [github-review-report](github-review-report/) ⭐ **推荐**
+
+**Purpose**: 从 GitHub 仓库生成中文格式代码走查报告，支持按时间范围、分支、reviewer筛选，自动分类问题为15种类型并标记严重程度，生成Excel报表。
+
+**When to use**: 用户请求生成项目的代码走查报告（中文格式）、跟踪特定时间段的review活动、分析特定reviewer的反馈时。
+
+**Key features**:
+- **标准化数据源**: 始终使用 GitHub API (`gh` CLI) 而非本地 git log
+- **精确时间解析**: 支持相对时间表达（"这个月"、"上周"、"半个月"）
+- **灵活过滤**: fnmatch 模式匹配 include/exclude reviewers
+- **智能分类**: 自动将review建议分类为15种问题类型（书写规范、安全漏洞等）
+- **严重程度标记**: 根据问题类型自动标记严重程度（安全漏洞、内存泄漏=严重；其他=一般）
+- **中文摘要**: 将review建议摘要为中文（≤50字符）
+- **固定Reviewer**: Reviewer列固定填入值（默认 liuzheng）
+- **Excel格式**: pandas + openpyxl 生成标准格式报表
+- **紧急模式**: 5分钟内限制10个PR快速交付
+
+**输出文件名格式**: `模块名-代码走查报告-yyyymmdd.xlsx`
+
+**Excel报表列**（严格13列，中文格式，无额外列）:
+| 列名 | 数据源 | 说明 |
+|--------|--------|------|
+| 序号 | 自增序号 | 自动递增（1,2,3...） |
+| 包名 | --module-name 参数 | 项目名/模块名 |
+| 仓库地址 | `https://github.com/{repo}` | GitHub仓库URL |
+| 代码提交地址 | `pr['url']` | PR链接 |
+| 问题来源 | 映射表（1-3） | commit log(1) / 代码(2) / 注释(3) |
+| 问题描述 | 摘要后的review建议 | 中文摘要（≤50字符） |
+| 严重程度 | 根据问题类型确定 | 严重（类型8,12）；一般（其他） |
+| 影响分析 | 同问题描述 | 中文摘要（≤50字符） |
+| 问题类型 | 分类表（1-15） | 书写规范、安全漏洞、内存泄漏等15类 |
+| 提出人 | --reviewer 参数 | 固定值（默认 liuzheng） |
+| 提出时间 | `review['submittedAt']` | Review提交时间 |
+| 解决人 | `pr['mergedBy']['login']` | 合并者 |
+| 计划解决时间 | `pr['mergedAt']` | 合并时间 |
+| 实际解决时间 | `pr['mergedAt']` | 合并时间（同计划解决时间） |
+| 提出人确认是否验收通过 | 固定值 | 填"是" |
+| 问题状态 | 根据合并状态 | 已合并="关闭"；未合并="解决中" |
+
+**Resources**:
+- `SKILL.md` - 技能文档（决策流程图、分类表、关键词表）
+- `generator.py` - 可执行Python脚本（完整实现）
+
+**Usage**:
+```bash
+# 基本使用 - 这个月的review报告
+python generator.py \
+  --repo linuxdeepin/dde-cooperation \
+  --since "this month" \
+  --module-name dde-cooperation
+
+# 指定reviewer和分支 - 半个月的master分支review
+python generator.py \
+  --repo linuxdeepin/dde-cooperation \
+  --since "last 15 days" \
+  --module-name dde-cooperation \
+  --reviewer liuzheng \
+  --base master \
+  --include "sourcery-*" \
+  --exclude "*-bot"
+
+# 紧急模式 - 上周的review，5分钟内交付
+python generator.py \
+  --repo linuxdeepin/dde-cooperation \
+  --since "last week" \
+  --module-name dde-cooperation \
+  --limit 10
+```
+
+**执行流程**:
+1. 解析时间范围（"这个月" → 2026-01-01 to 2026-01-22）
+2. 通过 `gh pr list` API 获取PR数据
+3. 应用reviewer过滤（include/exclude fnmatch模式）
+4. 通过 `gh pr view` 获取详细PR数据（comments, reviews）
+5. 提取review建议并分类问题类型（15种）和问题来源（3种）
+6. 根据问题类型确定严重程度（严重/一般）
+7. 摘要为中文（≤50字符）
+8. 生成Excel（严格13列，中文格式）
+9. 输出文件：`模块名-代码走查报告-yyyymmdd.xlsx`
+
+**问题类型分类（15种）**:
+| 序号 | 分类 | 说明 |
+|------|------|------|
+| 1 | 书写规范 | 命名、格式等 |
+| 2 | 日志规范 | 日志输出规范 |
+| 3 | 头文件规范 | .h文件规范 |
+| 4 | 变量规范 | 变量命名规则 |
+| 5 | 常量规范 | 常量定义规则 |
+| 6 | 宏定义规范 | 宏定义规则 |
+| 7 | 指针规范 | 指针使用规范 |
+| 8 | 代码安全漏洞 | 安全漏洞、缓冲区溢出等 |
+| 9 | 代码冗余 | 重复代码、冗余逻辑 |
+| 10 | 注释规范 | 注释格式规范 |
+| 11 | 编译警告 | 编译警告相关 |
+| 12 | 内存未释放 | 内存泄漏、未释放 |
+| 13 | 提交内容规范 | commit信息规范 |
+| 14 | 不符合需求 | 需求不符 |
+| 15 | 其他 | 其他问题 |
+
+**严重程度分类**:
+- **严重**: 问题类型8（代码安全漏洞）、12（内存未释放）
+- **一般**: 其他所有类型（1-7, 9-11, 13-15）
+
+**关键特性**:
+- ✅ 决策流程图（帮助快速判断）
+- ✅ 15种问题类型分类
+- ✅ 3种问题来源分类
+- ✅ 严重程度自动标记
+- ✅ 中文格式输出（列名、问题类型、严重程度等）
+- ✅ 固定Reviewer值（填入liuzheng）
+- ✅ 问题状态自动判断（关闭/解决中）
+- ✅ 边缘情况处理（空结果、紧急模式）
+
 ## Dependencies
 
 ### Git Workflow Skill
@@ -323,6 +438,21 @@ prepare for release
 **Git configuration** (required):
 - git config user.name
 - git config user.email
+
+### GitHub Review Report Skill
+
+**System requirements**:
+- Python 3.8+
+- gh CLI (GitHub CLI tool)
+- git config for repository access
+
+**Python dependencies**:
+- pandas
+- openpyxl
+
+**Git configuration** (required):
+- GitHub authentication (gh auth login)
+- Repository access permissions
 
 ### Qt Compatibility Build Skill
 
@@ -375,6 +505,9 @@ prepare for release
 ```
 deepin-skills/
 ├── README.md                                  # This file
+├── github-review-report/                        # GitHub review report skill
+│   ├── SKILL.md                               # Skill documentation (1559 words)
+│   └── generator.py                            # Executable Python script
 ├── qt-compatibility-build/                    # Qt5/Qt6 auto-detection compatibility skill
 │   └── SKILL.md                               # Skill documentation
 ├── git-commit-workflow/                       # Git workflow skill
@@ -438,6 +571,7 @@ Each skill includes:
 - qt-translation-assistant: <500 words
 - qt-compatibility-build: 864 words (technique skill with CMake patterns and dependency mapping)
 - create-release-tags: <1000 words (technique skill with implementation details)
+- github-review-report: 1559 words (technique skill with decision flow and pattern matching tables)
 
 Most skills under 500-word limit for efficient context usage. Technique skills with implementation details may exceed this limit but should remain concise.
 
@@ -448,12 +582,15 @@ Most skills under 500-word limit for efficient context usage. Technique skills w
 - CMake 3.10+
 - Google Test 1.8+
 - C++14/17/20
+- GitHub repositories (via `gh` CLI)
+- Python 3.8+ (pandas, openpyxl)
 
 **Supports**:
 - Libraries (libs/)
 - Plugins (plugins/)
 - Services (services/)
 - Standalone source files
+- GitHub-hosted repositories
 
 ## License
 
