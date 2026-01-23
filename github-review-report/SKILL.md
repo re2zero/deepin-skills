@@ -1,5 +1,7 @@
+---
 name: github-review-report
-description: Use when generating GitHub code review reports from PRs, filtering by date range, branch, and reviewer, outputting Chinese format Excel with AI-powered analysis
+description: Use when generating Chinese format Excel reports from GitHub code reviews with AI analysis and filtering by date, branch, or reviewers
+---
 
 # GitHub Code Review Report (Chinese Format with AI Analysis)
 
