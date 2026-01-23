@@ -212,15 +212,20 @@ ${original_review_content}
 2. 提取核心问题点
 3. 分类问题类型（从15种类型中选择）
 4. 评估严重程度（严重或一般）
-5. 生成中文问题描述（≤50字）
-6. 生成影响分析（≤20字）
-7. 如果无明显影响，填"无"
+5. 判断问题来源（commit log=1, 代码=2, 注释=3）
+   - 默认为"代码"（2）
+   - 只有当review明确提到注释问题才选"注释"（3）
+   - 只有当review明确提到commit信息/格式问题才选"commit log"（1）
+6. 生成中文问题描述（≤50字）
+7. 生成影响分析（≤20字）
+8. 如果无明显影响，填"无"
 
 **输出格式（JSON）：**
 ```json
 {
   "is_valid_review": true/false,
   "problem_type": 1-15,
+  "problem_source": 1/2/3,
   "problem_description": "中文问题描述≤50字",
   "impact_analysis": "中文影响分析≤20字（或"无"）",
   "confidence": high/medium/low,
@@ -246,7 +251,7 @@ for review in valid_reviews:
         '包名': module_name,
         '仓库地址': f"https://github.com/{repo}",
         '代码提交地址': pr.get('url', ''),
-        '问题来源': PROBLEM_SOURCES.get(3, '注释'),
+        '问题来源': PROBLEM_SOURCES.get(result.get('problem_source', 2), '代码'),
         '问题描述': result['problem_description'],
         '严重程度': result.get('severity', '一般'),
         '影响分析': result['impact_analysis'],
@@ -297,7 +302,7 @@ if set(required_columns) != set(df_template.columns):
 df_final = pd.concat([df_template, df_processed], ignore_index=True)
 
 # Save to Excel
-output_file = f"{module_name}-代码review报告-{yyyymmdd}.xlsx"
+output_file = f"{module_name}-代码走查报告-{yyyymmdd}.xlsx"
 df_final.to_excel(output_file, index=False, engine='openpyxl')
 ```
 
@@ -329,15 +334,20 @@ AI_PROMPT_TEMPLATE = """
 1. 判断这是否为有效的代码review（不是简单的批准或自动评论）
 2. 提取核心问题点
 3. 分类问题类型（从15种类型中选择）
-3. 评估严重程度（严重或一般）
-4. 生成中文问题描述（≤50字）
-5. 生成影响分析（≤20字）
-6. 如果无明显影响，填"无"
+4. 评估严重程度（严重或一般）
+5. 判断问题来源（commit log=1, 代码=2, 注释=3）
+   - 默认为"代码"（2）
+   - 只有当review明确提到注释问题才选"注释"（3）
+   - 只有当review明确提到commit信息/格式问题才选"commit log"（1）
+6. 生成中文问题描述（≤50字）
+7. 生成影响分析（≤20字）
+8. 如果无明显影响，填"无"
 
 **输出格式（JSON）：**
 {{
   "is_valid_review": true/false,
   "problem_type": 1-15,
+  "problem_source": 1/2/3,
   "problem_description": "中文问题描述≤50字",
   "impact_analysis": "中文影响分析≤20字（或"无"）",
   "confidence": high/medium/low,
@@ -354,7 +364,7 @@ AI_PROMPT_TEMPLATE = """
 | 包名 | --module-name 参数 | 用户指定 |
 | 仓库地址 | `https://github.com/{repo}` | GitHub URL |
 | 代码提交地址 | `pr['url']` | PR链接 |
-| 问题来源 | 映射表（1-3） | commit log(1) / 代码(2) / 注释(3) |
+| 问题来源 | 映射表（1-3，默认为代码2） | commit log(1) / 代码(2) / 注释(3) |
 | 问题描述 | AI生成的中文描述（≤50字） | AI分析结果 |
 | 严重程度 | 问题类型8(安全)、12(内存)="严重"，其他="一般" | AI判断 |
 | 影响分析 | AI生成的影响分析（≤20字或"无"） | AI分析结果 |
@@ -408,6 +418,7 @@ gh pr view 123 --repo linuxdeepin/dde-cooperation \
 | Not validating reviews before AI | AI can judge validity itself | Send all to AI, let it determine validity |
 | Processing reviews individually | Slows down AI | Batch process: collect all, then send to AI as array |
 | Missing error handling | AI may fail | Try-catch and provide meaningful error messages |
+| Wrong default problem source value | Default should be "代码"(2), not "注释"(3) | Use result.get('problem_source', 2) and map correctly |
 
 ## Rationalization Table
 
@@ -430,5 +441,7 @@ gh pr view 123 --repo linuxdeepin/dde-cooperation \
 - Not batching AI requests (slow and inefficient)
 - Using simple truncation instead of AI analysis
 - Changing reviewer/column specifications without skill update
+- Hardcoding problem source default value to anything other than "代码"(2)
+- Not letting AI determine problem source (use AI's judgment, don't assume)
 
 **All of these mean: STOP. Re-read skill. Start over with correct two-phase approach.**
